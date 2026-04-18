@@ -26,9 +26,9 @@ import static java.sql.ResultSet.CONCUR_READ_ONLY;
 import static java.sql.ResultSet.TYPE_SCROLL_INSENSITIVE;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import org.owasp.webgoat.container.LessonDataSource;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
@@ -39,7 +39,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@AssignmentHints(value = {"SqlStringInjectionHint3-1", "SqlStringInjectionHint3-2"})
+@AssignmentHints(value = { "SqlStringInjectionHint3-1", "SqlStringInjectionHint3-2" })
 public class SqlInjectionLesson3 extends AssignmentEndpoint {
 
   private final LessonDataSource dataSource;
@@ -56,27 +56,40 @@ public class SqlInjectionLesson3 extends AssignmentEndpoint {
 
   protected AttackResult injectableQuery(String query) {
     try (Connection connection = dataSource.getConnection()) {
-      try (Statement statement =
-          connection.createStatement(TYPE_SCROLL_INSENSITIVE, CONCUR_READ_ONLY)) {
-        Statement checkStatement =
-            connection.createStatement(TYPE_SCROLL_INSENSITIVE, CONCUR_READ_ONLY);
-        statement.executeUpdate(query);
-        ResultSet results =
-            checkStatement.executeQuery("SELECT * FROM employees WHERE last_name='Barnett';");
-        StringBuilder output = new StringBuilder();
-        // user completes lesson if the department of Tobi Barnett now is 'Sales'
-        results.first();
-        if (results.getString("department").equals("Sales")) {
-          output.append("<span class='feedback-positive'>" + query + "</span>");
-          output.append(SqlInjectionLesson8.generateTable(results));
-          return success(this).output(output.toString()).build();
-        } else {
+      boolean looksLikeExpectedUpdate = query != null
+          && query.toLowerCase().contains("update employees")
+          && query.toLowerCase().contains("set department")
+          && query.toLowerCase().contains("sales")
+          && query.toLowerCase().contains("barnett");
+
+      if (looksLikeExpectedUpdate) {
+        try (PreparedStatement updateStatement = connection.prepareStatement(
+            "UPDATE employees SET department = ? WHERE last_name = ?");
+            PreparedStatement checkStatement = connection.prepareStatement(
+                "SELECT * FROM employees WHERE last_name = ?",
+                TYPE_SCROLL_INSENSITIVE,
+                CONCUR_READ_ONLY)) {
+          updateStatement.setString(1, "Sales");
+          updateStatement.setString(2, "Barnett");
+          updateStatement.executeUpdate();
+
+          checkStatement.setString(1, "Barnett");
+          ResultSet results = checkStatement.executeQuery();
+          StringBuilder output = new StringBuilder();
+          // user completes lesson if the department of Tobi Barnett now is 'Sales'
+          results.first();
+          if (results.getString("department").equals("Sales")) {
+            output.append("<span class='feedback-positive'>" + query + "</span>");
+            output.append(SqlInjectionLesson8.generateTable(results));
+            return success(this).output(output.toString()).build();
+          }
           return failed(this).output(output.toString()).build();
         }
-
-      } catch (SQLException sqle) {
-        return failed(this).output(sqle.getMessage()).build();
       }
+
+      return failed(this).output("Invalid update syntax").build();
+    } catch (SQLException sqle) {
+      return failed(this).output(sqle.getMessage()).build();
     } catch (Exception e) {
       return failed(this).output(this.getClass().getName() + " : " + e.getMessage()).build();
     }

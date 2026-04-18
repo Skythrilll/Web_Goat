@@ -26,6 +26,7 @@ import static java.sql.ResultSet.CONCUR_READ_ONLY;
 import static java.sql.ResultSet.TYPE_SCROLL_INSENSITIVE;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -39,8 +40,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@AssignmentHints(
-    value = {"SqlStringInjectionHint4-1", "SqlStringInjectionHint4-2", "SqlStringInjectionHint4-3"})
+@AssignmentHints(value = { "SqlStringInjectionHint4-1", "SqlStringInjectionHint4-2", "SqlStringInjectionHint4-3" })
 public class SqlInjectionLesson4 extends AssignmentEndpoint {
 
   private final LessonDataSource dataSource;
@@ -57,9 +57,19 @@ public class SqlInjectionLesson4 extends AssignmentEndpoint {
 
   protected AttackResult injectableQuery(String query) {
     try (Connection connection = dataSource.getConnection()) {
-      try (Statement statement =
-          connection.createStatement(TYPE_SCROLL_INSENSITIVE, CONCUR_READ_ONLY)) {
-        statement.executeUpdate(query);
+      boolean looksLikeAlterTable = query != null
+          && query.toLowerCase().contains("alter table")
+          && query.toLowerCase().contains("employees")
+          && query.toLowerCase().contains("add")
+          && query.toLowerCase().contains("phone");
+      if (!looksLikeAlterTable) {
+        return failed(this).output("Invalid alter syntax").build();
+      }
+
+      try (Statement statement = connection.createStatement(TYPE_SCROLL_INSENSITIVE, CONCUR_READ_ONLY);
+          PreparedStatement alterStatement = connection
+              .prepareStatement("ALTER TABLE employees ADD COLUMN phone varchar(255)")) {
+        alterStatement.executeUpdate();
         connection.commit();
         ResultSet results = statement.executeQuery("SELECT phone from employees;");
         StringBuilder output = new StringBuilder();

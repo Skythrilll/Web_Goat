@@ -25,9 +25,9 @@ package org.owasp.webgoat.lessons.sqlinjection.introduction;
 import static java.sql.ResultSet.CONCUR_READ_ONLY;
 import static java.sql.ResultSet.TYPE_SCROLL_INSENSITIVE;
 
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import org.owasp.webgoat.container.LessonDataSource;
 import org.owasp.webgoat.container.assignments.AssignmentEndpoint;
 import org.owasp.webgoat.container.assignments.AssignmentHints;
@@ -38,13 +38,12 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@AssignmentHints(
-    value = {
-      "SqlStringInjectionHint2-1",
-      "SqlStringInjectionHint2-2",
-      "SqlStringInjectionHint2-3",
-      "SqlStringInjectionHint2-4"
-    })
+@AssignmentHints(value = {
+    "SqlStringInjectionHint2-1",
+    "SqlStringInjectionHint2-2",
+    "SqlStringInjectionHint2-3",
+    "SqlStringInjectionHint2-4"
+})
 public class SqlInjectionLesson2 extends AssignmentEndpoint {
 
   private final LessonDataSource dataSource;
@@ -59,16 +58,20 @@ public class SqlInjectionLesson2 extends AssignmentEndpoint {
     return injectableQuery(query);
   }
 
-  protected AttackResult injectableQuery(String query) {
+  protected AttackResult injectableQuery(String name) {
     try (var connection = dataSource.getConnection()) {
-      Statement statement = connection.createStatement(TYPE_SCROLL_INSENSITIVE, CONCUR_READ_ONLY);
-      ResultSet results = statement.executeQuery(query);
+      PreparedStatement statement = connection.prepareStatement(
+          "SELECT * FROM employees WHERE last_name = ?",
+          TYPE_SCROLL_INSENSITIVE,
+          CONCUR_READ_ONLY);
+      statement.setString(1, name);
+      ResultSet results = statement.executeQuery();
       StringBuilder output = new StringBuilder();
 
       results.first();
 
       if (results.getString("department").equals("Marketing")) {
-        output.append("<span class='feedback-positive'>" + query + "</span>");
+        output.append("<span class='feedback-positive'>" + name + "</span>");
         output.append(SqlInjectionLesson8.generateTable(results));
         return success(this).feedback("sql-injection.2.success").output(output.toString()).build();
       } else {
