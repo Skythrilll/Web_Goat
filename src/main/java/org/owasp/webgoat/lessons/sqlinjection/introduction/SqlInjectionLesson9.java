@@ -26,6 +26,7 @@ import static org.hsqldb.jdbc.JDBCResultSet.CONCUR_UPDATABLE;
 import static org.hsqldb.jdbc.JDBCResultSet.TYPE_SCROLL_SENSITIVE;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -39,14 +40,13 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@AssignmentHints(
-    value = {
-      "SqlStringInjectionHint.9.1",
-      "SqlStringInjectionHint.9.2",
-      "SqlStringInjectionHint.9.3",
-      "SqlStringInjectionHint.9.4",
-      "SqlStringInjectionHint.9.5"
-    })
+@AssignmentHints(value = {
+    "SqlStringInjectionHint.9.1",
+    "SqlStringInjectionHint.9.2",
+    "SqlStringInjectionHint.9.3",
+    "SqlStringInjectionHint.9.4",
+    "SqlStringInjectionHint.9.5"
+})
 public class SqlInjectionLesson9 extends AssignmentEndpoint {
 
   private final LessonDataSource dataSource;
@@ -63,17 +63,14 @@ public class SqlInjectionLesson9 extends AssignmentEndpoint {
 
   protected AttackResult injectableQueryIntegrity(String name, String auth_tan) {
     StringBuilder output = new StringBuilder();
-    String query =
-        "SELECT * FROM employees WHERE last_name = '"
-            + name
-            + "' AND auth_tan = '"
-            + auth_tan
-            + "'";
+    String query = "SELECT * FROM employees WHERE last_name = ? AND auth_tan = ?";
     try (Connection connection = dataSource.getConnection()) {
       try {
-        Statement statement = connection.createStatement(TYPE_SCROLL_SENSITIVE, CONCUR_UPDATABLE);
-        SqlInjectionLesson8.log(connection, query);
-        ResultSet results = statement.executeQuery(query);
+        PreparedStatement statement = connection.prepareStatement(query, TYPE_SCROLL_SENSITIVE, CONCUR_UPDATABLE);
+        statement.setString(1, name);
+        statement.setString(2, auth_tan);
+        SqlInjectionLesson8.log(connection, query + " [params: name=" + name + ", auth_tan=" + auth_tan + "]");
+        ResultSet results = statement.executeQuery();
         var test = results.getRow() != 0;
         if (results.getStatement() != null) {
           if (results.first()) {
@@ -103,8 +100,7 @@ public class SqlInjectionLesson9 extends AssignmentEndpoint {
   private AttackResult checkSalaryRanking(Connection connection, StringBuilder output) {
     try {
       String query = "SELECT * FROM employees ORDER BY salary DESC";
-      try (Statement statement =
-          connection.createStatement(TYPE_SCROLL_SENSITIVE, CONCUR_UPDATABLE); ) {
+      try (Statement statement = connection.createStatement(TYPE_SCROLL_SENSITIVE, CONCUR_UPDATABLE);) {
         ResultSet results = statement.executeQuery(query);
 
         results.first();

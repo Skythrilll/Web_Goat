@@ -23,6 +23,7 @@
 package org.owasp.webgoat.lessons.sqlinjection.introduction;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -36,15 +37,14 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@AssignmentHints(
-    value = {
-      "SqlStringInjectionHint.10.1",
-      "SqlStringInjectionHint.10.2",
-      "SqlStringInjectionHint.10.3",
-      "SqlStringInjectionHint.10.4",
-      "SqlStringInjectionHint.10.5",
-      "SqlStringInjectionHint.10.6"
-    })
+@AssignmentHints(value = {
+    "SqlStringInjectionHint.10.1",
+    "SqlStringInjectionHint.10.2",
+    "SqlStringInjectionHint.10.3",
+    "SqlStringInjectionHint.10.4",
+    "SqlStringInjectionHint.10.5",
+    "SqlStringInjectionHint.10.6"
+})
 public class SqlInjectionLesson10 extends AssignmentEndpoint {
 
   private final LessonDataSource dataSource;
@@ -61,14 +61,13 @@ public class SqlInjectionLesson10 extends AssignmentEndpoint {
 
   protected AttackResult injectableQueryAvailability(String action) {
     StringBuilder output = new StringBuilder();
-    String query = "SELECT * FROM access_log WHERE action LIKE '%" + action + "%'";
+    String query = "SELECT * FROM access_log WHERE action LIKE ?";
 
     try (Connection connection = dataSource.getConnection()) {
-      try {
-        Statement statement =
-            connection.createStatement(
-                ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
-        ResultSet results = statement.executeQuery(query);
+      try (PreparedStatement statement = connection.prepareStatement(
+          query, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY)) {
+        statement.setString(1, "%" + action + "%");
+        ResultSet results = statement.executeQuery();
 
         if (results.getStatement() != null) {
           results.first();
@@ -110,8 +109,7 @@ public class SqlInjectionLesson10 extends AssignmentEndpoint {
 
   private boolean tableExists(Connection connection) {
     try {
-      Statement stmt =
-          connection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
+      Statement stmt = connection.createStatement(ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY);
       ResultSet results = stmt.executeQuery("SELECT * FROM access_log");
       int cols = results.getMetaData().getColumnCount();
       return (cols > 0);

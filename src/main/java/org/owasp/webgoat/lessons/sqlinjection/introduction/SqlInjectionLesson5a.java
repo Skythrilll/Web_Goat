@@ -33,16 +33,15 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@AssignmentHints(value = {"SqlStringInjectionHint5a1"})
+@AssignmentHints(value = { "SqlStringInjectionHint5a1" })
 public class SqlInjectionLesson5a extends AssignmentEndpoint {
 
-  private static final String EXPLANATION =
-      "<br> Explanation: This injection works, because <span style=\"font-style: italic\">or '1' ="
-          + " '1'</span> always evaluates to true (The string ending literal for '1 is closed by"
-          + " the query itself, so you should not inject it). So the injected query basically looks"
-          + " like this: <span style=\"font-style: italic\">SELECT * FROM user_data WHERE"
-          + " first_name = 'John' and last_name = '' or TRUE</span>, which will always evaluate to"
-          + " true, no matter what came before it.";
+  private static final String EXPLANATION = "<br> Explanation: This injection works, because <span style=\"font-style: italic\">or '1' ="
+      + " '1'</span> always evaluates to true (The string ending literal for '1 is closed by"
+      + " the query itself, so you should not inject it). So the injected query basically looks"
+      + " like this: <span style=\"font-style: italic\">SELECT * FROM user_data WHERE"
+      + " first_name = 'John' and last_name = '' or TRUE</span>, which will always evaluate to"
+      + " true, no matter what came before it.";
   private final LessonDataSource dataSource;
 
   public SqlInjectionLesson5a(LessonDataSource dataSource) {
@@ -57,14 +56,12 @@ public class SqlInjectionLesson5a extends AssignmentEndpoint {
   }
 
   protected AttackResult injectableQuery(String accountName) {
-    String query = "";
+    String query = "SELECT * FROM user_data WHERE first_name = 'John' and last_name = ?";
     try (Connection connection = dataSource.getConnection()) {
-      query =
-          "SELECT * FROM user_data WHERE first_name = 'John' and last_name = '" + accountName + "'";
-      try (Statement statement =
-          connection.createStatement(
-              ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_UPDATABLE)) {
-        ResultSet results = statement.executeQuery(query);
+      try (PreparedStatement statement = connection.prepareStatement(
+          query, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_UPDATABLE)) {
+        statement.setString(1, accountName);
+        ResultSet results = statement.executeQuery();
 
         if ((results != null) && (results.first())) {
           ResultSetMetaData resultsMetaData = results.getMetaData();

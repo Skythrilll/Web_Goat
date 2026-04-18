@@ -44,12 +44,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @AssignmentHints({
-  "jwt-final-hint1",
-  "jwt-final-hint2",
-  "jwt-final-hint3",
-  "jwt-final-hint4",
-  "jwt-final-hint5",
-  "jwt-final-hint6"
+    "jwt-final-hint1",
+    "jwt-final-hint2",
+    "jwt-final-hint3",
+    "jwt-final-hint4",
+    "jwt-final-hint5",
+    "jwt-final-hint6"
 })
 public class JWTFinalEndpoint extends AssignmentEndpoint {
 
@@ -74,30 +74,29 @@ public class JWTFinalEndpoint extends AssignmentEndpoint {
       return failed(this).feedback("jwt-invalid-token").build();
     } else {
       try {
-        final String[] errorMessage = {null};
-        Jwt jwt =
-            Jwts.parser()
-                .setSigningKeyResolver(
-                    new SigningKeyResolverAdapter() {
-                      @Override
-                      public byte[] resolveSigningKeyBytes(JwsHeader header, Claims claims) {
-                        final String kid = (String) header.get("kid");
-                        try (var connection = dataSource.getConnection()) {
-                          ResultSet rs =
-                              connection
-                                  .createStatement()
-                                  .executeQuery(
-                                      "SELECT key FROM jwt_keys WHERE id = '" + kid + "'");
-                          while (rs.next()) {
-                            return TextCodec.BASE64.decode(rs.getString(1));
+        final String[] errorMessage = { null };
+        Jwt jwt = Jwts.parser()
+            .setSigningKeyResolver(
+                new SigningKeyResolverAdapter() {
+                  @Override
+                  public byte[] resolveSigningKeyBytes(JwsHeader header, Claims claims) {
+                    final String kid = (String) header.get("kid");
+                    try (var connection = dataSource.getConnection()) {
+                      try (var statement = connection.prepareStatement("SELECT key FROM jwt_keys WHERE id = ?")) {
+                        statement.setString(1, kid);
+                        try (ResultSet resultSet = statement.executeQuery()) {
+                          while (resultSet.next()) {
+                            return TextCodec.BASE64.decode(resultSet.getString(1));
                           }
-                        } catch (SQLException e) {
-                          errorMessage[0] = e.getMessage();
                         }
-                        return null;
                       }
-                    })
-                .parseClaimsJws(token);
+                    } catch (SQLException e) {
+                      errorMessage[0] = e.getMessage();
+                    }
+                    return null;
+                  }
+                })
+            .parseClaimsJws(token);
         if (errorMessage[0] != null) {
           return failed(this).output(errorMessage[0]).build();
         }

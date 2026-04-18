@@ -34,14 +34,13 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@AssignmentHints(
-    value = {
-      "SqlStringInjectionHint-advanced-6a-1",
-      "SqlStringInjectionHint-advanced-6a-2",
-      "SqlStringInjectionHint-advanced-6a-3",
-      "SqlStringInjectionHint-advanced-6a-4",
-      "SqlStringInjectionHint-advanced-6a-5"
-    })
+@AssignmentHints(value = {
+    "SqlStringInjectionHint-advanced-6a-1",
+    "SqlStringInjectionHint-advanced-6a-2",
+    "SqlStringInjectionHint-advanced-6a-3",
+    "SqlStringInjectionHint-advanced-6a-4",
+    "SqlStringInjectionHint-advanced-6a-5"
+})
 public class SqlInjectionLesson6a extends AssignmentEndpoint {
 
   private final LessonDataSource dataSource;
@@ -55,23 +54,23 @@ public class SqlInjectionLesson6a extends AssignmentEndpoint {
   @ResponseBody
   public AttackResult completed(@RequestParam(value = "userid_6a") String userId) {
     return injectableQuery(userId);
-    // The answer: Smith' union select userid,user_name, password,cookie,cookie, cookie,userid from
+    // The answer: Smith' union select userid,user_name, password,cookie,cookie,
+    // cookie,userid from
     // user_system_data --
   }
 
   public AttackResult injectableQuery(String accountName) {
-    String query = "";
+    String query = "SELECT * FROM user_data WHERE last_name = ?";
     try (Connection connection = dataSource.getConnection()) {
       boolean usedUnion = true;
-      query = "SELECT * FROM user_data WHERE last_name = '" + accountName + "'";
       // Check if Union is used
       if (!accountName.matches("(?i)(^[^-/*;)]*)(\\s*)UNION(.*$)")) {
         usedUnion = false;
       }
-      try (Statement statement =
-          connection.createStatement(
-              ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY)) {
-        ResultSet results = statement.executeQuery(query);
+      try (PreparedStatement statement = connection.prepareStatement(
+          query, ResultSet.TYPE_SCROLL_INSENSITIVE, ResultSet.CONCUR_READ_ONLY)) {
+        statement.setString(1, accountName);
+        ResultSet results = statement.executeQuery();
 
         if ((results != null) && results.first()) {
           ResultSetMetaData resultsMetaData = results.getMetaData();
@@ -81,11 +80,9 @@ public class SqlInjectionLesson6a extends AssignmentEndpoint {
 
           String appendingWhenSucceded;
           if (usedUnion)
-            appendingWhenSucceded =
-                "Well done! Can you also figure out a solution, by appending a new SQL Statement?";
+            appendingWhenSucceded = "Well done! Can you also figure out a solution, by appending a new SQL Statement?";
           else
-            appendingWhenSucceded =
-                "Well done! Can you also figure out a solution, by using a UNION?";
+            appendingWhenSucceded = "Well done! Can you also figure out a solution, by using a UNION?";
           results.last();
 
           if (output.toString().contains("dave") && output.toString().contains("passW0rD")) {
